@@ -103,9 +103,8 @@ func (m model) populate() {
 		input := []rune(m.textInput.Value())
 
 		// reset current index of the input string for this slice
-		var i int = 0
-		// reset the current color
-		var color int = 0
+		// reset the current colors
+		var i, fgColor, bgColor int
 
 		// something to do with the slice, honestly not really sure...
 		var z int = 0
@@ -115,11 +114,14 @@ func (m model) populate() {
 
 		// for each cell in this slice
 		for j := z; j <= slice-z; j++ {
+
 			// get the next char or " " if we're out of input
 			c := " "
 			if i < len(input) {
-				fgColor = runeToColor(color, input[i])
-				bgColor = runeToColor(
+				fgColor = runeToColor(fgColor, input[i])
+
+				// bgColor is always offset from fgColor
+				bgColor = runeToColor(fgColor, input[i])
 				c = string(input[i])
 				i++
 			}
