@@ -11,7 +11,8 @@ import (
 	"github.com/charmbracelet/lipgloss/table"
 )
 
-const MAX = 10
+// height/width of the identicon
+const MAX = 15
 
 func main() {
 	p := tea.NewProgram(initialModel())
@@ -24,14 +25,13 @@ type (
 	errMsg error
 )
 
+// Each cell value in the matrix holds a single letter
+// and a background/foreground color.
+// This way each cell can be styled independently.
 type cell struct {
 	value string
 	fg    lipgloss.Color
 	bg    lipgloss.Color
-}
-
-func (c cell) String() string {
-	return c.value
 }
 
 type model struct {
@@ -47,6 +47,7 @@ func initialModel() model {
 	ti.CharLimit = MAX
 	ti.Width = 20
 
+	// init the 2d matrix to hold the identicon
 	matrix := make([][]cell, MAX)
 	for i := range matrix {
 		matrix[i] = make([]cell, MAX)
@@ -73,9 +74,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	default:
+		// populate the matrix everytime the input changes
 		m.populate()
 
-	// We handle errors just like any other message
 	case errMsg:
 		m.err = msg
 		return m, nil
@@ -93,9 +94,18 @@ func (m model) View() string {
 	) + "\n"
 }
 
+// Add the int value of the next rune to the previous color value.
+// If it's outside the truecolor range then start over from the beginning.
+func runeToColor(prev int, next rune) int {
+	// the max number of possible truecolors
+	maxColor := 16777216
+	return (prev + int(next)) % maxColor
+}
+
 // populate fills the matrix in diagonal slices from the top right
 // https://stackoverflow.com/questions/1779199/traverse-matrix-in-diagonal-strips
 func (m model) populate() {
+
 	// for each diagonal slice
 	for slice := 0; slice < 2*MAX-1; slice++ {
 
@@ -104,9 +114,11 @@ func (m model) populate() {
 
 		// reset current index of the input string for this slice
 		// reset the current colors
-		var i, fgColor, bgColor int
+		var i int
+		var fg, bg int = 32, 64
 
-		// something to do with the slice, honestly not really sure...
+		// z is something to do with the slice
+		// honestly not really sure... ¯\_(ツ)_/¯
 		var z int = 0
 		if slice >= MAX {
 			z = slice - MAX + 1
@@ -115,28 +127,32 @@ func (m model) populate() {
 		// for each cell in this slice
 		for j := z; j <= slice-z; j++ {
 
-			// get the next char or " " if we're out of input
+			// get the next char of the string
+			// or " " if we're out of input
 			c := " "
 			if i < len(input) {
-				fgColor = runeToColor(fgColor, input[i])
+				fg = runeToColor(fg, input[i])
 
-				// bgColor is always offset from fgColor
-				bgColor = runeToColor(fgColor, input[i])
+				// bg is intentionally offset again
+				// from bg so that they're not he same values
+				bg = runeToColor(fg, input[i])
+
+				// convert our rune back to a string for display.
 				c = string(input[i])
 				i++
 			}
+			// assign the cell the current letter and some colors
 			m.matrix[j][slice-j] = cell{
 				value: c,
-				fg:    lipgloss.Color(fmt.Sprintf("#%x", fgColor)),
-				bg:    lipgloss.Color(fmt.Sprintf("#%x", bgColor)),
+				fg:    lipgloss.Color(fmt.Sprintf("#%x", fg)),
+				bg:    lipgloss.Color(fmt.Sprintf("#%x", bg)),
 			}
 		}
 	}
 }
 
 func (m model) render() string {
-	// convert the matrix to [][]string
-	// man it would be nice if Go had a mapper func
+	// convert the matrix to back to a [][]string
 	rows := make([][]string, MAX)
 	for i, row := range m.matrix {
 		rows[i] = make([]string, MAX)
@@ -145,11 +161,12 @@ func (m model) render() string {
 		}
 	}
 
+	// render our matrix as an identicon w/ styling
 	re := lipgloss.NewRenderer(os.Stdout)
 	t := table.New().
 		Border(lipgloss.HiddenBorder()).
 		BorderRow(true).
-		BorderColumn(true).
+		//BorderColumn(true).
 		Rows(rows...).
 		StyleFunc(
 			func(row, col int) lipgloss.Style {
@@ -160,11 +177,4 @@ func (m model) render() string {
 					Background(m.matrix[row-1][col].bg)
 			})
 	return t.Render()
-}
-
-// Add the int value of the next rune to the previous color value
-// if its outside the trucolor range then start over
-func runeToColor(prev int, next rune) int {
-	maxColor := 16777216 // the max number of possible truecolors
-	return (prev + int(next)) % maxColor
 }
